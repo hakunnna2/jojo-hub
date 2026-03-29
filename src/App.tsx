@@ -715,10 +715,19 @@ export default function App() {
   }
 
   const [showIntro, setShowIntro] = useState(true);
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (!supportsBrowserNotifications()) return 'denied';
     return Notification.permission;
   });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const [exams, setExams] = useState<Exam[]>(() => storage.getItem('exams', []));
 
@@ -983,11 +992,11 @@ export default function App() {
             </button>
             <div className="hidden md:flex flex-col items-end">
               <p className="text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">Current_Cycle</p>
-              <p className="text-xs font-mono font-bold">{new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }).toUpperCase()}</p>
+              <p className="text-xs font-mono font-bold">{currentDateTime.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }).toUpperCase()}</p>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">System_Clock</p>
-              <p className="text-xs font-mono font-bold text-[var(--accent)]">{new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-xs font-mono font-bold text-[var(--accent)]">{currentDateTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
             </div>
           </div>
         </div>
