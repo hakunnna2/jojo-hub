@@ -460,6 +460,7 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const examDateInputRef = useRef<HTMLInputElement | null>(null);
   const [newExam, setNewExam] = useState({
     subject: '',
     date: '',
@@ -553,13 +554,24 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
                   </option>
                 ))}
               </select>
-              <input 
-                type="date" 
-                className="w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-[10px] font-mono text-white focus:outline-none focus:border-[var(--accent)]"
-                value={newExam.date}
-                onChange={e => setNewExam({...newExam, date: e.target.value})}
-                required
-              />
+              <div className="flex items-center gap-2 w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 focus-within:border-[var(--accent)]">
+                <Calendar size={14} className="text-[var(--accent)]" />
+                <input
+                  ref={examDateInputRef}
+                  type="date"
+                  className="w-full bg-transparent text-[10px] font-mono text-white focus:outline-none"
+                  value={newExam.date}
+                  onChange={e => setNewExam({...newExam, date: e.target.value})}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => examDateInputRef.current?.showPicker?.()}
+                  className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors"
+                >
+                  Pick
+                </button>
+              </div>
               <button 
                 type="submit"
                 className="w-full bg-[var(--accent)] text-white py-2 rounded text-[10px] font-mono uppercase tracking-widest hover:brightness-110"
