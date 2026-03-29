@@ -33,6 +33,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Always fetch index.html from network to check for updates
+  if (event.request.url.includes('index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (!response || response.status !== 200) {
+            return caches.match(event.request);
+          }
+
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+
+          // Notify all clients about updates
+          self.clients.matchAll().then((clients) => {
+            clients.forEach((client) => {
+              client.postMessage({ type: 'UPDATE_AVAILABLE' });
+            });
+          });
+
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Cache-first strategy for other assets
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) {
@@ -57,4 +88,11 @@ self.addEventListener('fetch', (event) => {
         });
     })
   );
+});
+
+// Check for updates periodically
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

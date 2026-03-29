@@ -826,6 +826,44 @@ export default function App() {
     };
   }, []);
 
+  // Service worker update handler
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+        toast(
+          (t) => (
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="font-semibold text-white">Update Available</p>
+                <p className="text-sm text-white/70">A new version of Study Hub is ready</p>
+              </div>
+              <button
+                onClick={() => {
+                  window.location.reload();
+                }}
+                className="px-3 py-1.5 rounded bg-[var(--accent)] text-white text-sm font-mono uppercase tracking-widest hover:brightness-110 transition-all whitespace-nowrap"
+              >
+                Reload
+              </button>
+            </div>
+          ),
+          {
+            duration: 0,
+            position: 'top-center',
+          }
+        );
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  }, []);
+
   const requestNotificationPermission = async () => {
     if (!supportsBrowserNotifications()) {
       toast.error('Desktop notifications are not supported in this browser.');
