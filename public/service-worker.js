@@ -33,8 +33,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Always fetch index.html from network to check for updates
-  if (event.request.url.includes('index.html')) {
+  // Always fetch index.html and manifest.json from network to check for updates
+  if (event.request.url.includes('index.html') || event.request.url.includes('manifest.json')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
