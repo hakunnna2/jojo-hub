@@ -476,6 +476,19 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
     toast.success('Exam registered in database');
   };
 
+  const openExamDatePicker = () => {
+    const input = examDateInputRef.current;
+    if (!input) return;
+
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  };
+
   const sortedExams = [...exams].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return (
@@ -554,19 +567,32 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
                   </option>
                 ))}
               </select>
-              <div className="flex items-center gap-2 w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 focus-within:border-[var(--accent)]">
+              <div
+                className="flex items-center gap-2 w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 focus-within:border-[var(--accent)] cursor-pointer"
+                onClick={openExamDatePicker}
+              >
                 <Calendar size={14} className="text-[var(--accent)]" />
                 <input
                   ref={examDateInputRef}
                   type="date"
-                  className="w-full bg-transparent text-[10px] font-mono text-white focus:outline-none"
+                  className="w-full bg-transparent text-[10px] font-mono text-white focus:outline-none cursor-pointer"
                   value={newExam.date}
                   onChange={e => setNewExam({...newExam, date: e.target.value})}
+                  onKeyDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openExamDatePicker();
+                  }}
+                  readOnly
+                  inputMode="none"
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => examDateInputRef.current?.showPicker?.()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openExamDatePicker();
+                  }}
                   className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:text-white transition-colors"
                 >
                   Pick
