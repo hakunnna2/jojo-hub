@@ -463,7 +463,6 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
   const [newExam, setNewExam] = useState({
     subject: '',
     date: '',
-    time: '',
     notes: ''
   });
 
@@ -471,7 +470,7 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
     e.preventDefault();
     if (!newExam.subject || !newExam.date) return;
     onAddExam(newExam);
-    setNewExam({ subject: '', date: '', time: '', notes: '' });
+    setNewExam({ subject: '', date: '', notes: '' });
     setIsAdding(false);
     toast.success('Exam registered in database');
   };
@@ -554,21 +553,13 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
                   </option>
                 ))}
               </select>
-              <div className="grid grid-cols-2 gap-2">
-                <input 
-                  type="date" 
-                  className="bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-[10px] font-mono text-white focus:outline-none focus:border-[var(--accent)]"
-                  value={newExam.date}
-                  onChange={e => setNewExam({...newExam, date: e.target.value})}
-                  required
-                />
-                <input 
-                  type="time" 
-                  className="bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-[10px] font-mono text-white focus:outline-none focus:border-[var(--accent)]"
-                  value={newExam.time}
-                  onChange={e => setNewExam({...newExam, time: e.target.value})}
-                />
-              </div>
+              <input 
+                type="date" 
+                className="w-full bg-black/40 border border-[var(--border)] rounded px-3 py-2 text-[10px] font-mono text-white focus:outline-none focus:border-[var(--accent)]"
+                value={newExam.date}
+                onChange={e => setNewExam({...newExam, date: e.target.value})}
+                required
+              />
               <button 
                 type="submit"
                 className="w-full bg-[var(--accent)] text-white py-2 rounded text-[10px] font-mono uppercase tracking-widest hover:brightness-110"
@@ -588,7 +579,7 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-mono text-[10px] text-[var(--accent)]">
-                      [{new Date(exam.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}] {exam.time && `@${exam.time}`}
+                      [{new Date(exam.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}]
                     </span>
                     <button 
                       onClick={() => onDeleteExam(exam.id)}
@@ -896,7 +887,7 @@ export default function App() {
       exams.forEach(exam => {
         if (notifiedExams.includes(exam.id)) return;
 
-        const examDateTime = new Date(`${exam.date}T${exam.time || '00:00'}`).getTime();
+        const examDateTime = new Date(`${exam.date}T00:00`).getTime();
         const timeUntilExam = examDateTime - now;
 
         if (timeUntilExam > 0 && timeUntilExam <= leadTimeMs) {
