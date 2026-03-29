@@ -489,6 +489,13 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
     input.click();
   };
 
+  const blockManualDateTyping = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedKeys = ['Tab', 'Shift', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'];
+    if (!allowedKeys.includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const sortedExams = [...exams].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return (
@@ -578,13 +585,12 @@ const ExamCalendar = ({ exams, onAddExam, onDeleteExam, leadTime, onLeadTimeChan
                   className="w-full bg-transparent text-[10px] font-mono text-white focus:outline-none cursor-pointer"
                   value={newExam.date}
                   onChange={e => setNewExam({...newExam, date: e.target.value})}
-                  onKeyDown={(e) => e.preventDefault()}
+                  onKeyDown={blockManualDateTyping}
                   onClick={(e) => {
                     e.stopPropagation();
                     openExamDatePicker();
                   }}
-                  readOnly
-                  inputMode="none"
+                  onFocus={openExamDatePicker}
                   required
                 />
                 <button
