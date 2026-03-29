@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Play, 
   Pause, 
@@ -238,18 +238,18 @@ const PomodoroTimer = ({
       } else {
         // Timer completed in background - skip the session
         setMode(savedState.mode);
-        setTimeLeft(settings[savedState.mode] || 25 * 60);
+        setTimeLeft(25 * 60);
         setIsActive(false);
         setCompletedFocusCount(savedState.completedFocusCount);
       }
     }
   }, []);
 
-  const settings = {
+  const settings = useMemo(() => ({
     pomodoro: durations.pomodoro * 60,
     shortBreak: durations.shortBreak * 60,
     longBreak: durations.longBreak * 60,
-  };
+  }), [durations]);
 
   const updateDuration = (targetMode: TimerMode, value: string) => {
     const next = parseInt(value, 10);
@@ -283,25 +283,40 @@ const PomodoroTimer = ({
   }, [mode, isActive, onFocusSessionStarted]);
 
   useEffect(() => {
-    if (!isActive || timeLeft <= 0) return;
+    if (!isActive) {
+      // Cleanup when paused
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      timerStartTimeRef.current = null;
+      return;
+    }
 
-    // Set the start time when timer becomes active
+    // Timer is active - start it
     if (!timerStartTimeRef.current) {
       timerStartTimeRef.current = Date.now();
     }
 
+    const initialDuration = settings[mode];
+
+    // Use system clock to calculate elapsed time
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => Math.max(prev - 1, 0));
-    }, 1000);
+      const now = Date.now();
+      const elapsedMs = now - timerStartTimeRef.current!;
+      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+      const newTimeLeft = Math.max(0, initialDuration - elapsedSeconds);
+      
+      setTimeLeft(newTimeLeft);
+    }, 500); // Check twice per second for responsiveness
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      // Clear start time when timer is paused
-      if (!isActive) {
-        timerStartTimeRef.current = null;
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [isActive, mode]);
+  }, [isActive, mode, settings]);
 
   useEffect(() => {
     if (!isActive || timeLeft !== 0) return;
