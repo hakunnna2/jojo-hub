@@ -19,11 +19,112 @@ import { SUBJECTS } from './constants';
 import { TimerMode, Exam } from './types';
 import { storage } from './storage';
 
-const supportsBrowserNotifications = () => typeof window !== 'undefined' && 'Notification' in window;
+const supportsBrowserNotifications = () => {
+  return typeof window !== 'undefined' && 'Notification' in window;
+};
 
 const sendBrowserNotification = (title: string, body: string) => {
-  if (!supportsBrowserNotifications() || Notification.permission !== 'granted') return;
+  if (!supportsBrowserNotifications()) return;
+
+  if (Notification.permission !== 'granted') return;
   new Notification(title, { body });
+};
+
+const formatClock = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+const PiPOverlay = () => {
+  const [pipState, setPipState] = useState(() =>
+    storage.getItem('timer-pip-state', {
+      timeLeft: 25 * 60,
+      mode: 'pomodoro',
+      isActive: false,
+      selectedSubject: 'Self Study',
+      completedFocusCount: 0,
+    }),
+  );
+
+  useEffect(() => {
+    const sync = () => {
+      setPipState(
+        storage.getItem('timer-pip-state', {
+          timeLeft: 25 * 60,
+          mode: 'pomodoro',
+          isActive: false,
+          selectedSubject: 'Self Study',
+          completedFocusCount: 0,
+        }),
+      );
+    };
+
+    sync();
+    const interval = setInterval(sync, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const modeLabel =
+    pipState.mode === 'pomodoro' ? 'Focus' : pipState.mode === 'shortBreak' ? 'Short Break' : 'Long Break';
+  const dateLabel = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  });
+
+  const openMainAndClosePiP = async () => {
+    if (window.opener && !window.opener.closed) {
+      window.opener.focus();
+    }
+    window.close();
+  };
+
+  const sendPiPCommand = (action: 'start' | 'pause') => {
+    storage.setItem('timer-pip-command', {
+      id: Date.now(),
+      action,
+    });
+  };
+
+  return (
+    <div
+      onClick={openMainAndClosePiP}
+      className="h-screen w-screen p-3 bg-[linear-gradient(180deg,rgba(32,32,34,0.92),rgba(15,15,16,0.95))] text-white border border-white/10 rounded-2xl flex flex-col justify-between cursor-pointer shadow-[0_20px_45px_rgba(0,0,0,0.45)]"
+      style={{ fontFamily: 'Segoe UI, Inter, sans-serif' }}
+    >
+      <div className="flex items-center justify-between drag-region">
+        <span className="text-[10px] uppercase tracking-[0.22em] text-white/65">Picture in Picture</span>
+        <span className="text-[10px] text-white/65">{dateLabel}</span>
+      </div>
+
+      <div className="text-center mt-1">
+        <p className="text-[11px] text-white/60 tracking-[0.12em] uppercase">{modeLabel}</p>
+        <p className="text-[56px] leading-none mt-1 font-light tracking-wide">{formatClock(pipState.timeLeft)}</p>
+        <p className="text-[11px] mt-1 text-white/65">{pipState.selectedSubject}</p>
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] text-white/60">
+        <span>{pipState.isActive ? 'Running' : 'Paused'}</span>
+        <span>Cycles {pipState.completedFocusCount}</span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-center gap-2 no-drag" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => sendPiPCommand('start')}
+          className="px-3 py-1 rounded-full border border-white/25 text-white text-[10px] uppercase tracking-[0.12em] hover:bg-white/10 transition-colors"
+        >
+          Start
+        </button>
+        <button
+          onClick={() => sendPiPCommand('pause')}
+          className="px-3 py-1 rounded-full border border-white/25 text-white text-[10px] uppercase tracking-[0.12em] hover:bg-white/10 transition-colors"
+        >
+          Pause
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // --- Components ---
@@ -50,6 +151,7 @@ const PomodoroTimer = ({
   });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastPiPCommandRef = useRef<number>(0);
 
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -172,12 +274,39 @@ const PomodoroTimer = ({
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return formatClock(seconds);
   };
 
   const progress = (timeLeft / settings[mode]) * 100;
+
+  useEffect(() => {
+    storage.setItem('timer-pip-state', {
+      timeLeft,
+      mode,
+      isActive,
+      selectedSubject,
+      completedFocusCount,
+      updatedAt: Date.now(),
+    });
+  }, [timeLeft, mode, isActive, selectedSubject, completedFocusCount]);
+
+  useEffect(() => {
+    const pollPiPCommands = () => {
+      const command = storage.getItem<{ id: number; action: 'start' | 'pause' } | null>('timer-pip-command', null);
+      if (!command || !command.id || command.id <= lastPiPCommandRef.current) return;
+
+      lastPiPCommandRef.current = command.id;
+
+      if (command.action === 'start') {
+        setIsActive(true);
+      } else if (command.action === 'pause') {
+        setIsActive(false);
+      }
+    };
+
+    const interval = setInterval(pollPiPCommands, 300);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="hardware-panel p-5 lg:p-6 h-full flex flex-col items-center justify-between relative overflow-hidden">
@@ -572,6 +701,12 @@ const IntroMotivation = ({ onFinish }: { onFinish: () => void }) => {
 // --- Main App ---
 
 export default function App() {
+  const isPipMode = typeof window !== 'undefined' && window.location.hash === '#pip';
+
+  if (isPipMode) {
+    return <PiPOverlay />;
+  }
+
   const [showIntro, setShowIntro] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (!supportsBrowserNotifications()) return 'denied';
@@ -597,18 +732,93 @@ export default function App() {
   }, [notificationLeadTime]);
 
   const [activeSubject, setActiveSubject] = useState<string>('Self Study');
-  const [isAppFocused, setIsAppFocused] = useState(true);
+  const [isPiPOpen, setIsPiPOpen] = useState(false);
+  const pipWindowRef = useRef<Window | null>(null);
+
+  const togglePiP = async () => {
+    if (isPiPOpen) {
+      pipWindowRef.current?.close();
+      pipWindowRef.current = null;
+      setIsPiPOpen(false);
+      return;
+    }
+
+    const pipUrl = `${window.location.href.split('#')[0]}#pip`;
+    const popup = window.open(
+      pipUrl,
+      'jojo-study-pip',
+      'width=300,height=230,resizable=yes,scrollbars=no,menubar=no,toolbar=no,status=no,location=no',
+    );
+
+    if (!popup) {
+      toast.error('Popup blocked. Allow popups for this website to use Picture in Picture.');
+      return;
+    }
+
+    pipWindowRef.current = popup;
+    popup.focus();
+    setIsPiPOpen(true);
+  };
 
   useEffect(() => {
-    const handleFocus = () => setIsAppFocused(true);
-    const handleBlur = () => setIsAppFocused(false);
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
+    const interval = setInterval(() => {
+      if (pipWindowRef.current && pipWindowRef.current.closed) {
+        pipWindowRef.current = null;
+        setIsPiPOpen(false);
+      }
+    }, 500);
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
+      clearInterval(interval);
+      pipWindowRef.current?.close();
+      pipWindowRef.current = null;
+    };
+  }, []);
+
+  // Install prompt handler
+  useEffect(() => {
+    let deferredPrompt: any;
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="font-semibold text-white">Install Study Hub</p>
+              <p className="text-sm text-white/70">Access your studies anytime, anywhere</p>
+            </div>
+            <button
+              onClick={async () => {
+                if (deferredPrompt) {
+                  deferredPrompt.prompt();
+                  const { outcome } = await deferredPrompt.userChoice;
+                  if (outcome === 'accepted') {
+                    toast.success('App installed successfully!');
+                  }
+                  deferredPrompt = null;
+                  toast.dismiss(t);
+                }
+              }}
+              className="px-3 py-1.5 rounded bg-[var(--accent)] text-white text-sm font-mono uppercase tracking-widest hover:brightness-110 transition-all whitespace-nowrap"
+            >
+              Install
+            </button>
+          </div>
+        ),
+        {
+          duration: 10000,
+          position: 'top-center',
+        }
+      );
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
 
@@ -634,18 +844,6 @@ export default function App() {
 
     toast.info('Notification permission was dismissed.');
   };
-
-  useEffect(() => {
-    localStorage.setItem('exams', JSON.stringify(exams));
-  }, [exams]);
-
-  useEffect(() => {
-    localStorage.setItem('notified-exams', JSON.stringify(notifiedExams));
-  }, [notifiedExams]);
-
-  useEffect(() => {
-    localStorage.setItem('notification-lead-time', notificationLeadTime.toString());
-  }, [notificationLeadTime]);
 
   // Exam Notification Logic
   useEffect(() => {
@@ -723,6 +921,14 @@ export default function App() {
           </div>
           <div className="flex items-center gap-8">
             <button
+              onClick={togglePiP}
+              className={`hidden md:inline-flex h-8 items-center gap-2 px-3 rounded border text-[9px] font-mono uppercase tracking-widest transition-colors ${isPiPOpen ? 'border-[var(--accent)] text-white bg-[var(--accent)]/20' : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-white'}`}
+              title="Open/close Picture in Picture"
+            >
+              <Zap size={12} />
+              {isPiPOpen ? 'Close PiP' : 'Open PiP'}
+            </button>
+            <button
               onClick={requestNotificationPermission}
               className={`hidden md:inline-flex h-8 items-center gap-2 px-3 rounded border text-[9px] font-mono uppercase tracking-widest transition-colors ${notificationPermission === 'granted' ? 'border-green-500 text-green-400' : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-white'}`}
               title="Enable desktop notifications"
@@ -741,28 +947,6 @@ export default function App() {
           </div>
         </div>
       </header>
-
-      {/* Floating Badge (Picture-in-Picture style) */}
-      <AnimatePresence>
-        {!isAppFocused && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => window.focus()}
-            className="fixed bottom-6 right-6 z-50 bg-[var(--accent)] text-white p-4 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-transform flex items-center gap-2 font-mono text-xs uppercase tracking-widest"
-          >
-            <motion.div
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <Zap size={18} />
-            </motion.div>
-            <span>Back to Study</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
 
       <main className="max-w-7xl mx-auto h-[calc(100vh-3rem)] p-4 lg:p-6 grid grid-cols-2 gap-4 lg:gap-6 items-stretch overflow-hidden">
         {/* Left Column: Timer */}

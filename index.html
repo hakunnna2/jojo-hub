@@ -3,11 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="JoJo Study Hub - A Pomodoro timer with exam tracking and picture-in-picture support" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Study Hub" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23000000' width='192' height='192'/><text x='96' y='120' font-size='80' font-weight='bold' text-anchor='middle' fill='%23ffffff' font-family='Arial'>📚</text></svg>" />
+    <title>JoJo Study Hub</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js').catch(err => {
+            console.log('Service worker registration failed:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
 

@@ -86,3 +86,11 @@
 [data-sonner-toaster] [data-sonner-toast][data-swiped="true"] {
   animation: slideOutRight 0.3s cubic-bezier(0.4, 0, 1, 1);
 }
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
