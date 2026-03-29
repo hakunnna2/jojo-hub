@@ -11,15 +11,21 @@
   "icons": [
     {
       "src": "icon.svg",
-      "sizes": "192x192",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
       "src": "icon.svg",
-      "sizes": "512x512",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><defs><linearGradient id='bg'><stop offset='0%' style='stop-color:%231a1a1a'/><stop offset='100%' style='stop-color:%23000000'/></linearGradient></defs><rect width='192' height='192' fill='url(%23bg)' rx='45'/><circle cx='96' cy='105' r='45' fill='%23ff6321' opacity='0.95'/><ellipse cx='75' cy='105' rx='36' ry='43' fill='none' stroke='%23ff6321' stroke-width='2' opacity='0.4'/><ellipse cx='117' cy='105' rx='36' ry='43' fill='none' stroke='%23ff6321' stroke-width='2' opacity='0.4'/><path d='M 90 60 Q 87 50 96 46 Q 105 50 102 60 Z' fill='%23ff6321' opacity='0.85'/><ellipse cx='113' cy='51' rx='13' ry='7' fill='%23ff6321' opacity='0.7' transform='rotate(-35 113 51)'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "categories": ["productivity"],
