@@ -256,7 +256,7 @@ const PomodoroTimer = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isActive]);
+  }, [isActive, mode]);
 
   useEffect(() => {
     if (!isActive || timeLeft !== 0) return;
