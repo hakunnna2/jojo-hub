@@ -94,7 +94,45 @@ self.addEventListener('fetch', (event) => {
 
 // Check for updates periodically
 self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body } = event.data.payload || {};
+    if (!title) return;
+
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body: body || '',
+        tag: 'jojo-study-hub',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        renotify: true,
+        data: {
+          url: '/',
+        },
+      })
+    );
+    return;
+  }
+
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const appClient = clients.find((client) => 'focus' in client);
+      if (appClient) {
+        return appClient.focus();
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow('/');
+      }
+
+      return null;
+    })
+  );
 });

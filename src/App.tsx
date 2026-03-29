@@ -71,11 +71,34 @@ const sendBrowserNotification = (title: string, body: string) => {
   if (!supportsBrowserNotifications()) return;
 
   if (Notification.permission !== 'granted') return;
-  const notification = new Notification(title, { body, tag: 'jojo-study-hub' });
-  notification.onclick = () => {
-    window.focus();
-    notification.close();
+
+  const notify = async () => {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.showNotification(title, {
+          body,
+          tag: 'jojo-study-hub',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          data: {
+            url: window.location.href,
+          },
+        });
+        return;
+      }
+    }
+
+    const notification = new Notification(title, { body, tag: 'jojo-study-hub' });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
   };
+
+  void notify().catch((error) => {
+    console.error('Notification error:', error);
+  });
 };
 
 const formatClock = (seconds: number) => {
