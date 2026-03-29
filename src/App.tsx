@@ -27,7 +27,11 @@ const sendBrowserNotification = (title: string, body: string) => {
   if (!supportsBrowserNotifications()) return;
 
   if (Notification.permission !== 'granted') return;
-  new Notification(title, { body });
+  const notification = new Notification(title, { body, tag: 'jojo-study-hub' });
+  notification.onclick = () => {
+    window.focus();
+    notification.close();
+  };
 };
 
 const formatClock = (seconds: number) => {
@@ -210,13 +214,13 @@ const PomodoroTimer = ({
         );
       } else {
         nextMode = 'pomodoro';
-        shouldAutoStart = true;
+        shouldAutoStart = false;
         toast.info('Break is over!', {
           icon: <Bell className="text-blue-500" />,
-          description: 'NEXT: FOCUS',
+          description: 'CLICK START TO BEGIN FOCUS',
           duration: 5000,
         });
-        sendBrowserNotification('Break is over', 'Next: Focus session');
+        sendBrowserNotification('Break is over', 'Click start to begin focus session');
       }
       
       if (audioRef.current) {
