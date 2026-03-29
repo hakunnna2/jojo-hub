@@ -255,10 +255,10 @@ const PomodoroTimer = ({
     if (!milestone) return;
 
     const messages: Record<number, string> = {
-      5: 'Strong start. Keep the momentum going.',
-      10: 'Great consistency. Stay locked in.',
+      5: 'allez JoJo !!',
+      10: 'JoJo, Keep focus, no phone!!',
       15: 'You are in deep work mode. Keep pushing.',
-      20: 'Final stretch. Finish this session strong.',
+      20: 'Final 5 min, keep going!!',
     };
 
     const message = messages[milestone] || 'Keep going. You are doing great.';
