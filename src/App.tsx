@@ -247,54 +247,61 @@ const PomodoroTimer = ({
   }, [mode, isActive, onFocusSessionStarted]);
 
   useEffect(() => {
-    if (isActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      let nextMode: TimerMode = mode;
-      let shouldAutoStart = false;
+    if (!isActive || timeLeft <= 0) return;
 
-      if (mode === 'pomodoro') {
-        const nextFocusCount = completedFocusCount + 1;
-        const shouldTakeLongBreak = nextFocusCount % 4 === 0;
-        nextMode = shouldTakeLongBreak ? 'longBreak' : 'shortBreak';
-        shouldAutoStart = true;
-        setCompletedFocusCount(nextFocusCount);
-        onFocusSessionCompleted(durations.pomodoro, selectedSubject);
-        focusStartTrackedRef.current = false;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => Math.max(prev - 1, 0));
+    }, 1000);
 
-        toast.success('Focus session complete!', {
-          icon: <Bell className="text-[var(--accent)]" />,
-          description: `NEXT: ${nextMode === 'longBreak' ? 'LONG BREAK' : 'SHORT BREAK'}`,
-          duration: 5500,
-        });
-        sendBrowserNotification(
-          'Focus session complete',
-          `Next: ${nextMode === 'longBreak' ? 'Long Break' : 'Short Break'}`,
-        );
-      } else {
-        nextMode = 'pomodoro';
-        shouldAutoStart = false;
-        toast.info('Break is over!', {
-          icon: <Bell className="text-blue-500" />,
-          description: 'CLICK START TO BEGIN FOCUS',
-          duration: 5000,
-        });
-        sendBrowserNotification('Break is over', 'Click start to begin focus session');
-      }
-      
-      if (audioRef.current) {
-        audioRef.current.play().catch(e => console.log('Audio play blocked', e));
-      }
-      
-      setMode(nextMode);
-      setTimeLeft(settings[nextMode]);
-      setIsActive(shouldAutoStart);
-    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive || timeLeft !== 0) return;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    let nextMode: TimerMode = mode;
+    let shouldAutoStart = false;
+
+    if (mode === 'pomodoro') {
+      const nextFocusCount = completedFocusCount + 1;
+      const shouldTakeLongBreak = nextFocusCount % 4 === 0;
+      nextMode = shouldTakeLongBreak ? 'longBreak' : 'shortBreak';
+      shouldAutoStart = true;
+      setCompletedFocusCount(nextFocusCount);
+      onFocusSessionCompleted(durations.pomodoro, selectedSubject);
+      focusStartTrackedRef.current = false;
+
+      toast.success('Focus session complete!', {
+        icon: <Bell className="text-[var(--accent)]" />,
+        description: `NEXT: ${nextMode === 'longBreak' ? 'LONG BREAK' : 'SHORT BREAK'}`,
+        duration: 5500,
+      });
+      sendBrowserNotification(
+        'Focus session complete',
+        `Next: ${nextMode === 'longBreak' ? 'Long Break' : 'Short Break'}`,
+      );
+    } else {
+      nextMode = 'pomodoro';
+      shouldAutoStart = false;
+      toast.info('Break is over!', {
+        icon: <Bell className="text-blue-500" />,
+        description: 'CLICK START TO BEGIN FOCUS',
+        duration: 5000,
+      });
+      sendBrowserNotification('Break is over', 'Click start to begin focus session');
+    }
+
+    if (audioRef.current) {
+      audioRef.current.play().catch((e) => console.log('Audio play blocked', e));
+    }
+
+    setMode(nextMode);
+    setTimeLeft(settings[nextMode]);
+    setIsActive(shouldAutoStart);
   }, [
     isActive,
     timeLeft,
