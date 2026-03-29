@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg: #0A0A0B;
+  --panel: #151619;
+  --border: #2A2B2F;
+  --accent: #FF6321; /* Hardware Orange */
+  --text-primary: #FFFFFF;
+  --text-secondary: #8E9299;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg)] text-[var(--text-primary)] font-sans antialiased;
+    background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+    background-size: 24px 24px;
+    background-attachment: fixed;
+    overflow: hidden;
+  }
+}
+
+.hardware-panel {
+  @apply bg-[var(--panel)] border border-[var(--border)] rounded-xl shadow-2xl;
+}
+
+.hardware-label {
+  @apply font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--text-secondary)];
+}
+
+.hardware-value {
+  @apply font-mono text-2xl tracking-tighter;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Grid background effect */
+.bg-grid {
+  background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* Enhanced toast animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  animation: slideInRight 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-swiped="true"] {
+  animation: slideOutRight 0.3s cubic-bezier(0.4, 0, 1, 1);
+}
