@@ -16,8 +16,52 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { SUBJECTS } from './constants';
-import { TimerMode, Exam } from './types';
+import { TimerMode, Exam, StudySession } from './types';
 import { storage } from './storage';
+
+type UpdateInfo = {
+  version: string;
+  changelog: string;
+};
+
+const CURRENT_APP_VERSION = 'v2.1.0';
+
+const getStartOfWeek = (date: Date) => {
+  const current = new Date(date);
+  const day = current.getDay();
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  current.setHours(0, 0, 0, 0);
+  current.setDate(current.getDate() - diffToMonday);
+  return current;
+};
+
+const getDayKey = (timestamp: number) => {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date
+    .getDate()
+    .toString()
+    .padStart(2, '0')}`;
+};
+
+const calculateCurrentStreak = (sessions: StudySession[]) => {
+  if (sessions.length === 0) return 0;
+
+  const uniqueDayKeys = new Set(sessions.map((session) => getDayKey(session.timestamp)));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let cursor = new Date(today);
+  let streak = 0;
+
+  while (uniqueDayKeys.has(getDayKey(cursor.getTime()))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+};
+
+const toHours = (minutes: number) => (minutes / 60).toFixed(1);
 
 const supportsBrowserNotifications = () => {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -136,11 +180,15 @@ const PiPOverlay = () => {
 const PomodoroTimer = ({ 
   subjects,
   selectedSubject,
-  onSubjectChange
+  onSubjectChange,
+  onFocusSessionStarted,
+  onFocusSessionCompleted
 }: { 
   subjects: string[],
   selectedSubject: string,
-  onSubjectChange: (subject: string) => void
+  onSubjectChange: (subject: string) => void,
+  onFocusSessionStarted: () => void,
+  onFocusSessionCompleted: (durationMinutes: number, subject: string) => void
 }) => {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -156,6 +204,7 @@ const PomodoroTimer = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastPiPCommandRef = useRef<number>(0);
+  const focusStartTrackedRef = useRef(false);
 
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -179,6 +228,9 @@ const PomodoroTimer = ({
     setMode(newMode);
     setTimeLeft(settings[newMode]);
     setIsActive(false);
+    if (newMode === 'pomodoro') {
+      focusStartTrackedRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -186,6 +238,13 @@ const PomodoroTimer = ({
       setTimeLeft(settings[mode]);
     }
   }, [durations, mode]);
+
+  useEffect(() => {
+    if (mode === 'pomodoro' && isActive && !focusStartTrackedRef.current) {
+      focusStartTrackedRef.current = true;
+      onFocusSessionStarted();
+    }
+  }, [mode, isActive, onFocusSessionStarted]);
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
@@ -202,6 +261,8 @@ const PomodoroTimer = ({
         nextMode = shouldTakeLongBreak ? 'longBreak' : 'shortBreak';
         shouldAutoStart = true;
         setCompletedFocusCount(nextFocusCount);
+        onFocusSessionCompleted(durations.pomodoro, selectedSubject);
+        focusStartTrackedRef.current = false;
 
         toast.success('Focus session complete!', {
           icon: <Bell className="text-[var(--accent)]" />,
@@ -234,7 +295,16 @@ const PomodoroTimer = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isActive, timeLeft, mode, settings, completedFocusCount]);
+  }, [
+    isActive,
+    timeLeft,
+    mode,
+    settings,
+    completedFocusCount,
+    durations.pomodoro,
+    selectedSubject,
+    onFocusSessionCompleted,
+  ]);
 
   useEffect(() => {
     if (mode === 'pomodoro') {
@@ -737,6 +807,99 @@ const IntroMotivation = ({ onFinish }: { onFinish: () => void }) => {
   );
 };
 
+const ProgressIntelPanel = ({
+  sessions,
+  startedCount,
+  completedCount,
+}: {
+  sessions: StudySession[];
+  startedCount: number;
+  completedCount: number;
+}) => {
+  const weekStart = getStartOfWeek(new Date()).getTime();
+  const weeklySessions = sessions.filter((session) => session.timestamp >= weekStart);
+  const weeklyMinutes = weeklySessions.reduce((total, session) => total + session.duration, 0);
+  const streakDays = calculateCurrentStreak(sessions);
+  const totalMinutes = sessions.reduce((total, session) => total + session.duration, 0);
+
+  const completionRate = startedCount > 0 ? Math.round((completedCount / startedCount) * 100) : 0;
+
+  const subjectMap = sessions.reduce<Record<string, number>>((acc, session) => {
+    acc[session.subjectId] = (acc[session.subjectId] || 0) + session.duration;
+    return acc;
+  }, {});
+
+  const topSubjects = Object.entries(subjectMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const hourMap = sessions.reduce<Record<number, number>>((acc, session) => {
+    const hour = new Date(session.timestamp).getHours();
+    acc[hour] = (acc[hour] || 0) + session.duration;
+    return acc;
+  }, {});
+
+  const bestHourEntry = Object.entries(hourMap).sort((a, b) => b[1] - a[1])[0];
+  const bestStudyHour = bestHourEntry ? `${bestHourEntry[0].padStart(2, '0')}:00` : '--:--';
+
+  return (
+    <div className="hardware-panel p-5 lg:p-6 h-full min-h-0 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
+      <motion.div
+        initial={{ y: 18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-black/35"
+      >
+        <Activity size={14} className="text-[var(--accent)]" />
+        <span className="hardware-label text-[9px]">analytics / streak</span>
+      </motion.div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+          <p className="hardware-label">Current Streak</p>
+          <p className="font-mono text-lg text-[var(--accent)]">{streakDays} day{streakDays === 1 ? '' : 's'}</p>
+        </div>
+        <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+          <p className="hardware-label">Completion Rate</p>
+          <p className="font-mono text-lg text-[var(--accent)]">{completionRate}%</p>
+        </div>
+      </div>
+
+      <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+        <p className="hardware-label">This Week</p>
+        <p className="font-mono text-lg text-[var(--accent)]">{toHours(weeklyMinutes)}h</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+          <p className="hardware-label">Total Focus</p>
+          <p className="font-mono text-lg text-[var(--accent)]">{toHours(totalMinutes)}h</p>
+        </div>
+        <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+          <p className="hardware-label">Best Hour</p>
+          <p className="font-mono text-lg text-[var(--accent)]">{bestStudyHour}</p>
+        </div>
+      </div>
+
+      <div className="bg-black/30 border border-[var(--border)] rounded-lg p-3">
+        <p className="hardware-label mb-2">Subject Breakdown</p>
+        {topSubjects.length > 0 ? (
+          <div className="space-y-2">
+            {topSubjects.map(([subject, minutes]) => (
+              <div key={subject} className="flex min-w-0 items-center justify-between text-[10px] font-mono">
+                <span className="min-w-0 text-[var(--text-secondary)] truncate pr-3">{subject}</span>
+                <span className="text-white">{toHours(minutes)}h</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] font-mono text-[var(--text-secondary)]">No sessions yet. Start a focus cycle.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -752,6 +915,7 @@ export default function App() {
     if (!supportsBrowserNotifications()) return 'denied';
     return Notification.permission;
   });
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -762,10 +926,25 @@ export default function App() {
   }, []);
 
   const [exams, setExams] = useState<Exam[]>(() => storage.getItem('exams', []));
+  const [studySessions, setStudySessions] = useState<StudySession[]>(() => storage.getItem('study-sessions', []));
+  const [focusStartedCount, setFocusStartedCount] = useState<number>(() => storage.getItem('focus-started-count', 0));
+  const [focusCompletedCount, setFocusCompletedCount] = useState<number>(() => storage.getItem('focus-completed-count', 0));
 
   useEffect(() => {
     storage.setItem('exams', exams);
   }, [exams]);
+
+  useEffect(() => {
+    storage.setItem('study-sessions', studySessions);
+  }, [studySessions]);
+
+  useEffect(() => {
+    storage.setItem('focus-started-count', focusStartedCount);
+  }, [focusStartedCount]);
+
+  useEffect(() => {
+    storage.setItem('focus-completed-count', focusCompletedCount);
+  }, [focusCompletedCount]);
 
   const [notifiedExams, setNotifiedExams] = useState<string[]>(() => storage.getItem('notified-exams', []));
 
@@ -876,12 +1055,15 @@ export default function App() {
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+        const version = event.data.version || CURRENT_APP_VERSION;
+        const changelog = event.data.changelog || 'Performance and reliability improvements.';
+        setUpdateInfo({ version, changelog });
         toast(
           (t) => (
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <p className="font-semibold text-white">Update Available</p>
-                <p className="text-sm text-white/70">A new version of Study Hub is ready</p>
+                <p className="text-sm text-white/70">A new version of Study Hub is ready ({version})</p>
               </div>
               <button
                 onClick={() => {
@@ -976,6 +1158,22 @@ export default function App() {
     setExams(exams.filter(e => e.id !== id));
   };
 
+  const handleFocusSessionStarted = () => {
+    setFocusStartedCount((prev) => prev + 1);
+  };
+
+  const handleFocusSessionCompleted = (durationMinutes: number, subject: string) => {
+    const session: StudySession = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      subjectId: subject,
+      duration: durationMinutes,
+      timestamp: Date.now(),
+    };
+
+    setStudySessions((prev) => [session, ...prev].slice(0, 500));
+    setFocusCompletedCount((prev) => prev + 1);
+  };
+
   if (showIntro) {
     return <IntroMotivation onFinish={() => setShowIntro(false)} />;
   }
@@ -1034,9 +1232,34 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto h-[calc(100vh-3rem)] p-4 lg:p-6 grid grid-cols-2 gap-4 lg:gap-6 items-stretch overflow-hidden">
+      {updateInfo && (
+        <div className="border-b border-[var(--accent)]/40 bg-[var(--accent)]/10 px-4 py-3">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--accent)]">Update ready {updateInfo.version}</p>
+              <p className="text-xs text-white/80">{updateInfo.changelog}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 rounded bg-[var(--accent)] text-white text-[10px] font-mono uppercase tracking-widest hover:brightness-110 transition-all"
+              >
+                Update now
+              </button>
+              <button
+                onClick={() => setUpdateInfo(null)}
+                className="px-3 py-1.5 rounded border border-[var(--border)] text-[var(--text-secondary)] text-[10px] font-mono uppercase tracking-widest hover:text-white transition-colors"
+              >
+                Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="max-w-7xl mx-auto h-[calc(100vh-3rem)] p-4 lg:p-6 grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 items-stretch overflow-y-auto xl:overflow-hidden">
         {/* Left Column: Timer */}
-        <div className="flex flex-col min-h-0">
+        <div className="flex flex-col min-h-[430px] xl:min-h-0 xl:overflow-y-auto xl:pr-1 custom-scrollbar">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1047,17 +1270,19 @@ export default function App() {
               subjects={SUBJECTS}
               selectedSubject={activeSubject}
               onSubjectChange={setActiveSubject}
+              onFocusSessionStarted={handleFocusSessionStarted}
+              onFocusSessionCompleted={handleFocusSessionCompleted}
             />
           </motion.div>
         </div>
 
         {/* Right Column: Schedule */}
-        <div className="flex flex-col min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 gap-4 lg:gap-6 min-h-0 xl:overflow-y-auto xl:pr-1 custom-scrollbar">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex-1 flex flex-col min-h-0"
+            className="flex-1 flex flex-col min-h-[360px]"
           >
             <ExamCalendar 
               exams={exams} 
@@ -1065,6 +1290,18 @@ export default function App() {
               onDeleteExam={deleteExam} 
               leadTime={notificationLeadTime}
               onLeadTimeChange={setNotificationLeadTime}
+            />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="flex-1 min-h-[360px]"
+          >
+            <ProgressIntelPanel
+              sessions={studySessions}
+              startedCount={focusStartedCount}
+              completedCount={focusCompletedCount}
             />
           </motion.div>
         </div>

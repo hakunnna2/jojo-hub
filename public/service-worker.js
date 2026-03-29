@@ -1,4 +1,6 @@
-const CACHE_NAME = 'jojo-study-hub-v2';
+const CACHE_NAME = 'jojo-study-hub-v3';
+const APP_VERSION = 'v2.1.0';
+const CHANGELOG_SNIPPET = 'New analytics dashboard, streak tracking, weekly goals, and responsive layout improvements.';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -26,7 +28,11 @@ self.addEventListener('activate', (event) => {
     }).then(() => self.clients.matchAll())
       .then((clients) => {
         clients.forEach((client) => {
-          client.postMessage({ type: 'UPDATE_AVAILABLE' });
+          client.postMessage({
+            type: 'UPDATE_AVAILABLE',
+            version: APP_VERSION,
+            changelog: CHANGELOG_SNIPPET,
+          });
         });
       })
   );
