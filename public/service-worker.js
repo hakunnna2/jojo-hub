@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jojo-study-hub-v1';
+const CACHE_NAME = 'jojo-study-hub-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -23,7 +23,12 @@ self.addEventListener('activate', (event) => {
           .filter((cacheName) => cacheName !== CACHE_NAME)
           .map((cacheName) => caches.delete(cacheName))
       );
-    })
+    }).then(() => self.clients.matchAll())
+      .then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'UPDATE_AVAILABLE' });
+        });
+      })
   );
   self.clients.claim();
 });
@@ -33,44 +38,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Always fetch index.html and manifest.json from network to check for updates
-  if (event.request.url.includes('index.html') || event.request.url.includes('manifest.json')) {
+  // Network-first for app navigations so installed app receives fresh builds.
+  if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
           if (!response || response.status !== 200) {
-            return caches.match(event.request);
+            return caches.match('/index.html');
           }
 
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-          // Notify all clients about updates
-          self.clients.matchAll().then((clients) => {
-            clients.forEach((client) => {
-              client.postMessage({ type: 'UPDATE_AVAILABLE' });
-            });
+            cache.put('/index.html', responseToCache);
           });
 
           return response;
         })
         .catch(() => {
-          return caches.match(event.request);
+          return caches.match('/index.html');
         })
     );
     return;
   }
 
-  // Cache-first strategy for other assets
+  // Stale-while-revalidate for static assets.
   event.respondWith(
     caches.match(event.request).then((response) => {
-      if (response) {
-        return response;
-      }
-
-      return fetch(event.request)
+      const networkFetch = fetch(event.request)
         .then((response) => {
           if (!response || response.status !== 200 || response.type === 'error') {
             return response;
@@ -84,8 +78,10 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          return caches.match('/index.html');
+          return response;
         });
+
+      return response || networkFetch;
     })
   );
 });
