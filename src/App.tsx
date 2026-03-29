@@ -205,9 +205,44 @@ const PomodoroTimer = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastPiPCommandRef = useRef<number>(0);
   const focusStartTrackedRef = useRef(false);
+  const timerStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+  }, []);
+
+  // Initialize timer state from localStorage on mount
+  useEffect(() => {
+    const savedState = storage.getItem<{
+      timerStartTime: number | null;
+      mode: TimerMode;
+      isActive: boolean;
+      duration: number;
+      completedFocusCount: number;
+    } | null>('timer-session-state', null);
+
+    if (savedState && savedState.timerStartTime && savedState.isActive) {
+      // Timer was running when app closed - recover from system clock
+      const now = Date.now();
+      const elapsedMs = now - savedState.timerStartTime;
+      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+      const remainingSeconds = Math.max(0, savedState.duration - elapsedSeconds);
+
+      // If timer didn't complete, restore it
+      if (remainingSeconds > 0) {
+        setMode(savedState.mode);
+        setTimeLeft(remainingSeconds);
+        setIsActive(true);
+        timerStartTimeRef.current = now; // Reset start time to now for continuous countdown
+        setCompletedFocusCount(savedState.completedFocusCount);
+      } else {
+        // Timer completed in background - skip the session
+        setMode(savedState.mode);
+        setTimeLeft(settings[savedState.mode] || 25 * 60);
+        setIsActive(false);
+        setCompletedFocusCount(savedState.completedFocusCount);
+      }
+    }
   }, []);
 
   const settings = {
@@ -228,6 +263,7 @@ const PomodoroTimer = ({
     setMode(newMode);
     setTimeLeft(settings[newMode]);
     setIsActive(false);
+    timerStartTimeRef.current = null; // Clear start time on mode switch
     if (newMode === 'pomodoro') {
       focusStartTrackedRef.current = false;
     }
@@ -249,12 +285,21 @@ const PomodoroTimer = ({
   useEffect(() => {
     if (!isActive || timeLeft <= 0) return;
 
+    // Set the start time when timer becomes active
+    if (!timerStartTimeRef.current) {
+      timerStartTimeRef.current = Date.now();
+    }
+
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => Math.max(prev - 1, 0));
     }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      // Clear start time when timer is paused
+      if (!isActive) {
+        timerStartTimeRef.current = null;
+      }
     };
   }, [isActive, mode]);
 
@@ -262,6 +307,7 @@ const PomodoroTimer = ({
     if (!isActive || timeLeft !== 0) return;
 
     if (timerRef.current) clearInterval(timerRef.current);
+    timerStartTimeRef.current = null; // Clear start time on completion
 
     let nextMode: TimerMode = mode;
     let shouldAutoStart = false;
@@ -352,6 +398,7 @@ const PomodoroTimer = ({
   const resetTimer = () => {
     setIsActive(false);
     setTimeLeft(settings[mode]);
+    timerStartTimeRef.current = null; // Clear start time on reset
   };
 
   const formatTime = (seconds: number) => {
@@ -370,6 +417,19 @@ const PomodoroTimer = ({
       updatedAt: Date.now(),
     });
   }, [timeLeft, mode, isActive, selectedSubject, completedFocusCount]);
+
+  // Persist timer session state to localStorage for recovery on app reopen
+  useEffect(() => {
+    const duration = settings[mode];
+    storage.setItem('timer-session-state', {
+      timerStartTime: timerStartTimeRef.current,
+      mode,
+      isActive,
+      duration,
+      completedFocusCount,
+      lastSavedAt: Date.now(),
+    });
+  }, [isActive, mode, settings, completedFocusCount]);
 
   useEffect(() => {
     const pollPiPCommands = () => {
