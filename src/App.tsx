@@ -110,7 +110,7 @@ const formatClock = (seconds: number) => {
 const PiPOverlay = () => {
   const [pipState, setPipState] = useState(() =>
     storage.getItem('timer-pip-state', {
-      timeLeft: 25 * 60,
+      timeLeft: 60 * 60,
       mode: 'pomodoro',
       isActive: false,
       selectedSubject: 'Self Study',
@@ -122,7 +122,7 @@ const PiPOverlay = () => {
     const sync = () => {
       setPipState(
         storage.getItem('timer-pip-state', {
-          timeLeft: 25 * 60,
+          timeLeft: 60 * 60,
           mode: 'pomodoro',
           isActive: false,
           selectedSubject: 'Self Study',
@@ -214,14 +214,14 @@ const PomodoroTimer = ({
   onFocusSessionCompleted: (durationMinutes: number, subject: string) => void
 }) => {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [timeLeft, setTimeLeft] = useState(60 * 60);
   const [isActive, setIsActive] = useState(false);
   const [completedFocusCount, setCompletedFocusCount] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sentEncouragementMarks, setSentEncouragementMarks] = useState<number[]>([]);
   const [durations, setDurations] = useState({
-    pomodoro: 25,
-    shortBreak: 5,
+    pomodoro: 60,
+    shortBreak: 10,
     longBreak: 15,
   });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -261,7 +261,7 @@ const PomodoroTimer = ({
       } else {
         // Timer completed in background - skip the session
         setMode(savedState.mode);
-        setTimeLeft(25 * 60);
+        setTimeLeft(60 * 60);
         setIsActive(false);
         setCompletedFocusCount(savedState.completedFocusCount);
       }
@@ -1116,7 +1116,7 @@ export default function App() {
       deferredPrompt = e;
 
       toast(
-        (t) => (
+        () => (
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <p className="font-semibold text-white">Install Study Hub</p>
@@ -1131,7 +1131,7 @@ export default function App() {
                     toast.success('App installed successfully!');
                   }
                   deferredPrompt = null;
-                  toast.dismiss(t);
+                  toast.dismiss();
                 }
               }}
               className="px-3 py-1.5 rounded bg-[var(--accent)] text-white text-sm font-mono uppercase tracking-widest hover:brightness-110 transition-all whitespace-nowrap"
@@ -1164,7 +1164,7 @@ export default function App() {
         const changelog = event.data.changelog || 'Performance and reliability improvements.';
         setUpdateInfo({ version, changelog });
         toast(
-          (t) => (
+          () => (
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <p className="font-semibold text-white">Update Available</p>
@@ -1290,7 +1290,6 @@ export default function App() {
         theme="dark"
         richColors
         expand
-        pauseWhenPageIsHidden
       />
 
       {/* Header */}
